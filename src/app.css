@@ -1,0 +1,145 @@
+/* Receipt Shelf specific styles */
+.hero-rs {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 560px) {
+  .hero-rs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.stubs {
+  display: grid;
+  gap: 8px;
+}
+.stub {
+  position: relative;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px 4px 0 0;
+  /* torn receipt edge */
+  -webkit-mask: linear-gradient(#000 0 0) top / 100% calc(100% - 6px) no-repeat, conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / 12px 6px repeat-x;
+  mask: linear-gradient(#000 0 0) top / 100% calc(100% - 6px) no-repeat, conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / 12px 6px repeat-x;
+  padding-bottom: 14px;
+  animation: stub-in 0.6s var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 90ms);
+}
+.stub-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+.stub-merchant {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.stub-total {
+  font-weight: 600;
+}
+.stub-meta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+@keyframes stub-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+.hero-cats {
+  display: grid;
+  gap: 8px;
+}
+.hero-cats .eyebrow {
+  margin: 0;
+}
+.hc-row {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.82rem;
+}
+.hc-track,
+.share {
+  display: block;
+  height: 10px;
+  background: var(--surface-2);
+  border-radius: 3px;
+  overflow: hidden;
+  min-width: 60px;
+}
+.hc-track span,
+.share span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transform-origin: left;
+  animation: grow-x 0.8s var(--ease) both;
+}
+@keyframes grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+.table .badge {
+  margin-left: 6px;
+}
+.receipt-img {
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.photo-empty {
+  display: grid;
+  place-items: center;
+  min-height: 180px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+}
+.claim-cols {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .claim-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.claim-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.claim-list li {
+  display: grid;
+  gap: 2px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.claim-list a {
+  overflow-wrap: anywhere;
+}
+@media (prefers-reduced-motion: reduce) {
+  .stub,
+  .hc-track span,
+  .share span {
+    animation: none;
+  }
+}

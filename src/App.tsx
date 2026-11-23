@@ -1,12 +1,384 @@
-import {useEffect,useMemo,useState} from 'react';import {uid,toMarkdown,csv} from './logic';import './styles.css';
-const cfg={"slug":"receipt-organizer","name":"Receipt Shelf","purpose":"Local receipt records with search, filters, totals, and CSV export.","kind":"receipt","fields":["Merchant","category","amount","date","notes"],"accent":"cyan"} as const;const pages=[['home','Home'],['workspace','Receipts'],['guide','Search & filters'],['examples','Export guide'],['reference','Categories'],['help','Help']] as const;type Page=typeof pages[number][0];type Item={id:string;title:string;createdAt:string;[key:string]:string};const key='local-portfolio:'+cfg.slug;const makeDemo=():Item[]=>['Field note — Alder','Follow-up — Miro','Review — Sol','Plan — Juniper','Archive — Nia','Decision — Rowan','Reminder — Theo','Research — Imani','Checklist — Ellis','Exception — Saffron'].map((title,i)=>({id:'demo-'+i,title,createdAt:new Date(Date.now()-i*86400000).toISOString(),[cfg.fields[1]]:['In focus','Scheduled','Reviewed','Waiting','Reference'][i%5],[cfg.fields[2]]:['Ready','Needs review','Complete','Paused','Archived'][i%5],[cfg.fields[3]]:new Date(Date.now()+(i-3)*86400000).toISOString().slice(0,10),[cfg.fields[4]]:i===4?'A longer fictional note showing a realistic exception, the decision taken, and what should be checked before the record is used again.':'Fictional demo data for a populated local workspace.'}));function download(n:string,s:string,t='text/plain'){const x=document.createElement('a');x.href=URL.createObjectURL(new Blob([s],{type:t}));x.download=n;x.click();URL.revokeObjectURL(x.href)}
-export default function App(){const requested=location.hash.slice(1);const [page,setPage]=useState<Page|'notfound'>(()=>pages.some(([id])=>id===requested)?requested as Page:requested?'notfound':'home');const [records,setRecords]=useState<Item[]>(()=>{try{return JSON.parse(localStorage.getItem(key)||'null')||makeDemo()}catch{return makeDemo()}});const [form,setForm]=useState<Record<string,string>>({});const [query,setQuery]=useState('');const [notice,setNotice]=useState('');const [answer,setAnswer]=useState('');const [editing,setEditing]=useState<Item|null>(null);useEffect(()=>{document.title=(page==='home'?cfg.name:page==='notfound'?'Page not found':cfg.name+' — '+page);if(page!=='notfound')location.hash=page},[page]);const save=(x:Item[])=>{setRecords(x);localStorage.setItem(key,JSON.stringify(x))};const filtered=useMemo(()=>records.filter(r=>JSON.stringify(r).toLowerCase().includes(query.toLowerCase())),[records,query]);const add=(ev:React.FormEvent)=>{ev.preventDefault();const title=form[cfg.fields[0]]?.trim();if(!title){setNotice('Add a '+cfg.fields[0].toLowerCase()+' before saving.');return}const next={id:editing?.id||uid(),title,createdAt:editing?.createdAt||new Date().toISOString()} as Item;cfg.fields.forEach(f=>next[f]=form[f]||'');save(editing?records.map(r=>r.id===editing.id?next:r):[next,...records]);setForm({});setEditing(null);setNotice(editing?'Record updated locally.':'Saved locally. You can now find it in the archive or export it.')};const importJson=async(file?:File)=>{if(!file)return;try{const parsed=JSON.parse(await file.text());if(!Array.isArray(parsed)||!parsed.every(x=>x&&typeof x.title==='string'))throw new Error();save(parsed);setNotice('Imported '+parsed.length+' records into this browser.')}catch{setNotice('That file is not a valid export. Your existing records were left unchanged.')}};return <div className={'app '+cfg.accent}><div className="shell"><header><div className="brand"><small>LOCAL EDITION</small>{cfg.name}</div><nav aria-label="Primary">{pages.map(([id,label])=><button className={page===id?'active':''} key={id} onClick={()=>setPage(id)}>{label}</button>)}</nav></header>{page==='home'&&<Home records={records} open={()=>setPage('workspace')}/>} {page==='workspace'&&<Workspace/>}{page==='notfound'&&<NotFound/>}{page==='guide'&&<Guide title="Search & filters"/>}{page==='examples'&&<Examples/>}{page==='reference'&&<Reference/>}{page==='help'&&<Help/>}</div></div>;
-function Home({records,open}:{records:Item[];open:()=>void}){return <><section className="hero"><div><p className="eyebrow">A CLEARER WAY TO WORK LOCALLY</p><h1>Receipt Shelf keeps the important details <i>findable.</i></h1><p>Small purchases become easier to reconcile when merchant, category, date, and note are captured together.</p><div className="actions"><button className="primary" onClick={open}>Open receipts</button><button onClick={()=>download(cfg.slug+'-demo.md',toMarkdown(cfg.name,records))}>Export demo</button></div></div><aside className="preview"><div className="preview-head">LIVE SAMPLE <span>● DEMO DATA</span></div><div className="preview-title">What is ready today</div>{records.slice(0,3).map((r,i)=><div className="peek" key={r.id}><div><b>{r.title}</b><br/><small>{r[cfg.fields[1]]}</small></div><span>{i===0?'NOW':'SAVED'}</span></div>)}<div className="preview-foot">No account. No sync. Export when you choose.</div></aside></section><section className="section"><p className="eyebrow">01 / FIRST RECORD</p><h2>Begin with a record you will need again.</h2><p>Save a receipt record, filter by category or merchant, then export the selected history when needed.</p><div className="card-grid"><div className="info-card"><strong>1. Name the detail</strong><p>Use the first field for the thing you will search for later, rather than a vague catch-all.</p></div><div className="info-card"><strong>2. Add context</strong><p>Record the practical facts beside it: status, timing, and the note that explains the decision.</p></div><div className="info-card"><strong>3. Review deliberately</strong><p>Search your local history, export when needed, and remove data that is no longer useful.</p></div></div></section><section className="section story"><p className="eyebrow">02 / WHY THIS RECORD EXISTS</p><h2>Small details are where useful decisions begin.</h2><p>{cfg.purpose} This is deliberately a local record rather than a social feed, an account portal, or an automated recommendation. It gives you a calm place to capture the exact fact, its context, and the practical next question while you still remember why it matters.</p><p>Every entry is searchable by the words you wrote. Use concise fields for things you expect to compare later, then use the note for nuance: an exception, an uncertainty, or the reason a future version of you should pause before acting.</p></section><section className="section"><p className="eyebrow">03 / THE CURRENT DESK</p><h2>Ten examples, clearly fictional.</h2><p>The first records are labelled demo data. They exist to demonstrate active, scheduled, reviewed, and archived states—never to imply real people, transactions, outcomes, or activity.</p><div className="card-grid">{records.slice(0,6).map((r,i)=><div className="info-card" key={r.id}><strong>{String(i+1).padStart(2,'0')} · {r.title}</strong><p>{r[cfg.fields[1]]} · {r[cfg.fields[2]]}<br/>{r[cfg.fields[4]]}</p></div>)}</div></section><section className="section"><p className="eyebrow">04 / A PRACTICAL LOOP</p><h2>Capture. Review. Carry forward.</h2><div className="card-grid"><div className="info-card"><strong>Capture</strong><p>Open the workspace when the detail is fresh. The required title prevents a record that cannot be found later.</p></div><div className="info-card"><strong>Review</strong><p>Search by a name, category, status, or note. Empty results are an invitation to change the query, not a dead end.</p></div><div className="info-card"><strong>Carry forward</strong><p>Export a Markdown or CSV copy before a handoff, a planning session, or a browser reset. Local data is yours to move.</p></div></div></section><section className="section"><p className="eyebrow">05 / WHAT THE TOOL DOES NOT DO</p><h2>Clear boundaries are part of the design.</h2><p>This app does not silently synchronize, infer facts, send reminders, or make a recommendation for you. Dates, labels, financial figures, health-related notes, disposal guidance, and any decisions based on them depend entirely on the information you enter and the context you verify.</p></section><section className="section"><p className="eyebrow">06 / KEEP A PORTABLE COPY</p><h2>Local-first should never mean trapped.</h2><p>Use JSON import and export for a browser-local backup, or CSV and Markdown when you need a readable copy. Imported JSON replaces the current local collection only after the file is successfully parsed; malformed files leave the saved records unchanged and show a clear error.</p></section><section className="section"><p className="eyebrow">07 / CONTINUE IN THE TOOL</p><h2>Use the real workspace, not a mock-up.</h2><p>The preview above is built from the same saved records used in the workspace. Open it to add, edit, remove, filter, import, and export local data.</p><div className="actions"><button className="primary" onClick={open}>Open workspace</button></div></section><footer className="section footer"><p className="eyebrow">08 / LOCAL PROJECT NOTES</p><p>This product stores its data in the active browser profile. Read the guide and limitations before relying on it for a consequential decision.</p></footer></>}
-function Workspace(){return <section className="workspace"><div className="toolbar"><input aria-label="Search records" value={query} onChange={e=>setQuery(e.target.value)} placeholder={'Search '+cfg.name}/><button onClick={()=>download(cfg.slug+'.md',toMarkdown(cfg.name,records))}>Export Markdown</button><button onClick={()=>download(cfg.slug+'.csv',csv(records),'text/csv')}>Export CSV</button><button onClick={()=>download(cfg.slug+'.json',JSON.stringify(records,null,2),'application/json')}>Export JSON</button><label className="import">Import JSON<input type="file" accept="application/json" onChange={e=>importJson(e.target.files?.[0])}/></label></div><div className="grid"><form onSubmit={add}><h2>Add receipt</h2>{cfg.fields.map((f,i)=><label key={f}>{f}<input required={i===0} value={form[f]||''} onChange={e=>setForm({...form,[f]:e.target.value})} placeholder={'Enter '+f.toLowerCase()}/></label>)}<button className="primary">{editing?'Save changes':'Save record'}</button>{editing&&<button type="button" onClick={()=>{setEditing(null);setForm({})}}>Cancel edit</button>}{notice&&<p className="notice" role="status">{notice}</p>}</form><article className="records"><h2>{filtered.length} records</h2>{filtered.length===0?<p className="empty">No records match that search. Clear the search or create the first local record.</p>:filtered.map(r=><section className="card" key={r.id}><div><h3>{r.title}</h3>{cfg.fields.slice(1).map(f=><p key={f}><b>{f}</b> {r[f]||'—'}</p>)}</div><div><button onClick={()=>{setEditing(r);const values:Record<string,string>={};cfg.fields.forEach(f=>values[f]=r[f]||'');setForm(values);window.scrollTo({top:0,behavior:'smooth'})}}>Edit</button><button onClick={()=>{save(records.filter(x=>x.id!==r.id));setNotice('Record removed from this browser.')}}>Delete</button></div></section>)}</article></div><Special/></section>}
-function NotFound(){return <section className="section"><p className="eyebrow">404 / LOCAL ROUTE</p><h2>That page is not in this edition.</h2><p>Use the navigation to return to a known section.</p><button className="primary" onClick={()=>setPage('home')}>Return home</button></section>}
-function Guide({title}:{title:string}){return <Content kicker="02 / FIELD GUIDE" title={title} body="merchant, category, amount, export are the working vocabulary in this tool. The guide does not prescribe a single right process; it explains what each field records, why it is there, and how to keep the record useful over time." cards={[['Use plain language','Write the term that a future version of you will recognise quickly.'],['Keep dates practical','Use a date only when it helps you decide what to do or review next.'],['Separate facts from notes','Use short fields for filtering and the note for the detail that does not fit a label.']]}/>}
-function Examples(){return <Content kicker="03 / WORKED EXAMPLES" title="A record with enough context." body="The sample records are fictional and labelled as demo data. They show the difference between a title that can be found, structured fields that can be scanned, and a note that preserves the reason behind a decision." cards={[['A current item','Marked In focus, with a near date and a concise note.'],['A scheduled item','Has a future date so it appears when you are planning ahead.'],['An edge case','Uses a longer note to prove that more context remains readable.']]}/>}
-function Reference(){return <Content kicker="04 / METHOD" title="How this local tool handles information." body="Receipt Shelf stores records in this browser using localStorage. Search runs against the saved local data. Markdown and CSV exports are created in your browser. There is no account, server synchronization, automatic backup, or claim that this record is authoritative outside the information you enter." cards={[['Local first','Your records remain in the active browser profile until you export or remove them.'],['Simple exports','Exports are designed to be readable and portable, not a full database backup format.'],['Human review','Dates, amounts, labels, and reminders depend on the data you enter and should be checked before acting.']]}/>}
-function Help(){return <section className="section"><p className="eyebrow">05 / HELP & LIMITS</p><h2>Useful boundaries make a tool more trustworthy.</h2><div className="faq"><details open><summary>Where is my data stored?</summary><p>In localStorage for this browser profile. Clearing browser data may remove it; use an export for a copy you control.</p></details><details><summary>Is the demo data real?</summary><p>No. It is fictional sample material designed to show populated, long-text, status, and archive states.</p></details><details><summary>What happens when a form is incomplete?</summary><p>The first field is required. The form gives a plain-language message and keeps the entered values available to correct.</p></details><details><summary>Can this replace specialist advice?</summary><p>No. It is a personal organization aid. The limitations and relevant disclaimers should guide how you use the records.</p></details></div></section>}
-function Content({kicker,title,body,cards}:{kicker:string;title:string;body:string;cards:string[][]}){return <section className="section"><p className="eyebrow">{kicker}</p><h2>{title}</h2><p>{body}</p><div className="card-grid">{cards.map(c=><div className="info-card" key={c[0]}><strong>{c[0]}</strong><p>{c[1]}</p></div>)}</div></section>}
-function Special(){if((cfg.kind as string)==='algorithm')return <section className="lab"><h2>Visible operations</h2><p>Use these controls to see an ordered set change. They are deliberately small: the explanation matters more than spectacle.</p><button onClick={()=>setAnswer('Values sorted: 4, 7, 12, 19')}>Sort sample</button><button onClick={()=>setAnswer('One comparison explained: 12 is greater than 7, so it moves after 7.')}>Explain step</button><p role="status">{answer}</p></section>;if((cfg.kind as string)==='garden')return <section className="lab"><h2>Bed grid</h2><div className="bed">{Array.from({length:12},(_,i)=><button key={i} onClick={()=>setAnswer('Plant marker placed in bed cell '+(i+1))}>{answer.includes(String(i+1))?'●':'+'}</button>)}</div><p role="status">{answer||'Select a cell to place a marker.'}</p></section>;return <section className="lab"><h2>Practice note</h2><p>Use this local workspace with the guide alongside it. A good record is specific enough to help later and short enough to keep current.</p></section>}}
+import { useMemo, useState, type ReactNode } from 'react';
+import { DemoTag, EmptyState, Field, Landing, NotFound, Notice, PageHead, Shell, downloadText, uid, useFlash, usePersistentState, useRoute } from './shared/ui';
+import { DataTable, useTable, type Column } from './shared/table';
+import { toCSV } from './shared/csv';
+import { addDays, addMonths, formatDay, fromISO, todayISO } from './shared/dates';
+import {
+  CATEGORIES,
+  CLAIM_LABEL,
+  CSV_HEADERS,
+  METHODS,
+  advanceClaim,
+  applyFilters,
+  byCategory,
+  byMonth,
+  claimSummary,
+  csvRows,
+  duplicateGroups,
+  duplicatesOf,
+  totals,
+  validate,
+  type Category,
+  type Claim,
+  type Draft,
+  type Filters,
+  type Method,
+  type Receipt,
+} from './lib/receipts';
+
+const KEY = 'receipt-shelf:store';
+const NAV = [
+  { to: '/', label: 'Overview' },
+  { to: '/receipts', label: 'Receipts' },
+  { to: '/claims', label: 'Expense claims' },
+  { to: '/reports', label: 'Reports' },
+];
+const money = (n: number) => n.toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const STORAGE_SOFT_LIMIT = 4_000_000; // characters; browsers typically allow ~5 MB per site
+const CLAIM_BADGE: Record<Claim, string> = { none: '', 'to-claim': 'badge-warn', claimed: 'badge-accent', reimbursed: 'badge-ok' };
+
+interface Store {
+  receipts: Receipt[];
+}
+
+export function demoReceipts(today: string): Receipt[] {
+  const d = (n: number) => addDays(today, -n);
+  const x = (id: string, merchant: string, days: number, total: number, tax: number, category: Category, method: Method, tags: string[] = [], claim: Claim = 'none', note = ''): Receipt => ({ id: `demo-${id}`, merchant, date: d(days), total, tax, category, method, tags, note, claim, demo: true });
+  return [
+    x('1', 'Demo Supermarket', 2, 64.18, 3.12, 'Groceries', 'Card'),
+    x('2', 'Bean There Café', 3, 4.6, 0.38, 'Dining', 'Mobile wallet', ['coffee']),
+    x('3', 'Rail Co (demo)', 6, 86.5, 0, 'Travel', 'Card', ['work', 'client-visit'], 'to-claim', 'Return ticket for the client workshop'),
+    x('4', 'Hotel Demo Central', 7, 189, 18.9, 'Travel', 'Card', ['work', 'client-visit'], 'to-claim', 'One night, breakfast included'),
+    x('5', 'Paper Place', 12, 35.25, 5.88, 'Office', 'Card', ['work'], 'claimed'),
+    x('6', 'Demo Electronics', 20, 129.99, 21.67, 'Electronics', 'Card', ['warranty'], 'none', 'Wireless keyboard — keep for the 2-year warranty'),
+    x('7', 'Demo Pharmacy', 25, 18.4, 0, 'Health', 'Cash'),
+    x('8', 'Noodle Bar', 27, 31.2, 2.6, 'Dining', 'Card', ['work'], 'reimbursed', 'Team lunch'),
+    x('9', 'Demo Hardware', 33, 47.85, 7.98, 'Home', 'Card', ['diy']),
+    x('10', 'Demo Supermarket', 36, 71.03, 3.4, 'Groceries', 'Card'),
+    x('11', 'Bean There Café', 40, 9.2, 0.77, 'Dining', 'Mobile wallet', ['coffee']),
+    x('12', 'Taxi Demo', 41, 23.5, 0, 'Travel', 'Card', ['work'], 'reimbursed'),
+    x('13', 'Clothing Co. (demo) — seasonal sale, two jumpers and a waterproof jacket', 55, 148, 24.67, 'Clothing', 'Card', [], 'none', 'Long merchant name on purpose'),
+    x('14', 'Demo Supermarket', 63, 58.77, 2.9, 'Groceries', 'Cash'),
+    x('15', 'Co-working Demo', 70, 25, 4.17, 'Office', 'Card', ['work'], 'reimbursed', 'Day pass'),
+    x('16', 'Demo Supermarket', 2, 64.18, 3.12, 'Groceries', 'Card', [], 'none', 'Entered twice by mistake — shows duplicate detection'),
+    x('17', 'Demo Garden Centre', 95, 62.5, 10.42, 'Home', 'Card', ['garden']),
+    x('18', 'Demo Pharmacy', 120, 12.99, 0, 'Health', 'Card'),
+  ];
+}
+
+/** Downscales an image file to a JPEG data URL no wider/taller than `max` px. */
+async function downscale(file: File, max = 720): Promise<string> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(img.naturalWidth * k);
+    canvas.height = Math.round(img.naturalHeight * k);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('no canvas');
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.72);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+export default function App() {
+  const [route, navigate] = useRoute();
+  const today = todayISO();
+  const [store, setStore] = usePersistentState<Store>(KEY, () => ({ receipts: demoReceipts(today) }));
+  const ctx = { store, setStore, today, navigate };
+  const edit = route.match(/^\/receipt\/(.+)$/);
+  let page: ReactNode;
+  if (route === '/') page = <Home />;
+  else if (route === '/receipts') page = <List {...ctx} />;
+  else if (route === '/add') page = <Editor {...ctx} />;
+  else if (edit) page = <Editor {...ctx} id={edit[1]} />;
+  else if (route === '/claims') page = <Claims {...ctx} />;
+  else if (route === '/reports') page = <Reports {...ctx} />;
+  else page = <NotFound />;
+  return (
+    <Shell name="Receipt Shelf" wordmark={['Receipt', 'Shelf']} nav={NAV} route={route} cta={{ to: '/add', label: 'Add a receipt' }} footerNote="Receipts and photos stay in this browser. Keep originals where your tax authority requires them.">
+      {page}
+    </Shell>
+  );
+}
+
+type Ctx = { store: Store; setStore: (s: Store) => void; today: string; navigate: (to: string) => void };
+
+function Stub({ r, i }: { r: Receipt; i: number }) {
+  return (
+    <div className="stub" style={{ ['--i' as string]: i }}>
+      <div className="stub-top"><span className="stub-merchant">{r.merchant}</span><span className="mono stub-total">{money(r.total)}</span></div>
+      <div className="stub-meta small"><span>{formatDay(r.date, { day: 'numeric', month: 'short' })}</span><span>·</span><span>{r.category}</span>{r.claim !== 'none' && <span className={`badge ${CLAIM_BADGE[r.claim]}`}>{CLAIM_LABEL[r.claim]}</span>}</div>
+    </div>
+  );
+}
+
+function HeroPreview() {
+  const today = todayISO();
+  const list = demoReceipts(today);
+  const month = list.filter((r) => r.date >= addDays(today, -30));
+  const cats = byCategory(month).slice(0, 4);
+  const max = Math.max(...cats.map((c) => c.total));
+  return (
+    <div className="hero-rs">
+      <div className="stubs">{list.slice(0, 4).map((r, i) => <Stub key={r.id} r={r} i={i} />)}</div>
+      <div className="hero-cats">
+        <p className="eyebrow">Last 30 days · {money(totals(month).total)}</p>
+        {cats.map((c) => <div key={c.category} className="hc-row"><span>{c.category}</span><span className="hc-track"><span style={{ width: `${(c.total / max) * 100}%` }} /></span><span className="mono small">{money(c.total)}</span></div>)}
+      </div>
+    </div>
+  );
+}
+
+function Home() {
+  return (
+    <Landing
+      eyebrow="Receipt organiser"
+      title={<>Every receipt, <em>findable in seconds.</em></>}
+      lead="Log receipts with the merchant, amount, tax and a photo. Find any of them by name, tag or date, catch accidental duplicates, and turn work expenses into a claim you can export."
+      primary={{ href: '#/receipts', label: 'Open your receipts' }}
+      secondary={{ href: '#/claims', label: 'See expense claims' }}
+      previewLabel="Recent receipts — demo data"
+      preview={<HeroPreview />}
+      steps={[
+        { title: 'Snap and save', body: 'Enter the merchant, date, total and tax, and attach a photo. It’s shrunk in your browser so it fits in local storage.' },
+        { title: 'Tag and find', body: 'Tags such as “work” or “warranty”, categories and date ranges make any receipt quick to find.' },
+        { title: 'Claim and report', body: 'Mark work receipts “to claim”, export them for your employer, then track claimed and reimbursed totals.' },
+      ]}
+      stepsIntro="Receipt Shelf opens with eighteen labelled demo receipts, including one accidental duplicate. Clear them whenever you like."
+      features={[
+        { title: 'Duplicate check', body: 'Same merchant, date and total? You’re warned before saving and can review duplicates in the list.' },
+        { title: 'Photo attached', body: 'A downscaled copy of the receipt image lives with the record — no upload, no account.' },
+        { title: 'Expense claims', body: 'A to-claim → claimed → reimbursed pipeline with totals and a CSV for each claim.' },
+        { title: 'Reports', body: 'Spending per month and per category with labelled charts and tax totals.' },
+      ]}
+      note="Receipt Shelf is a personal organiser, not tax or accounting advice."
+      closing={{ title: <>Clear the <em>wallet pocket.</em></>, action: { href: '#/add', label: 'Add a receipt' } }}
+    />
+  );
+}
+
+/* ---------- List ---------- */
+function List({ store, setStore, today }: Ctx) {
+  const [flash, setFlash] = useFlash();
+  const [f, setF] = useState<Filters>({ q: '', category: '', claim: '', from: '', to: '', tag: '' });
+  const [onlyDupes, setOnlyDupes] = useState(false);
+  const dupes = duplicateGroups(store.receipts);
+  const dupeIds = new Set(dupes.flat().map((r) => r.id));
+  const rows = useMemo(() => applyFilters(store.receipts, f).filter((r) => !onlyDupes || dupeIds.has(r.id)), [store, f, onlyDupes]); // eslint-disable-line react-hooks/exhaustive-deps
+  const t = totals(rows);
+  const tags = [...new Set(store.receipts.flatMap((r) => r.tags))].sort();
+  const columns: Column<Receipt>[] = [
+    { key: 'merchant', label: 'Merchant', sort: (r) => r.merchant, render: (r) => <><a href={`#/receipt/${r.id}`}>{r.merchant}</a>{r.image && <span className="badge" title="Photo attached">Photo</span>}{dupeIds.has(r.id) && <span className="badge badge-warn">Possible duplicate</span>}{r.demo && <> <DemoTag /></>}{r.tags.length > 0 && <div className="small muted">{r.tags.map((x) => `#${x}`).join(' ')}</div>}</> },
+    { key: 'date', label: 'Date', sort: (r) => r.date, render: (r) => formatDay(r.date) },
+    { key: 'cat', label: 'Category', sort: (r) => r.category, render: (r) => r.category },
+    { key: 'claim', label: 'Claim', sort: (r) => r.claim, render: (r) => (r.claim === 'none' ? <span className="muted small">Personal</span> : <span className={`badge ${CLAIM_BADGE[r.claim]}`}>{CLAIM_LABEL[r.claim]}</span>) },
+    { key: 'tax', label: 'Tax', num: true, sort: (r) => r.tax, render: (r) => money(r.tax) },
+    { key: 'total', label: 'Total', num: true, sort: (r) => r.total, render: (r) => <strong>{money(r.total)}</strong> },
+  ];
+  const table = useTable(rows, columns, { initialSort: 'date', initialDir: 'desc', pageSize: 10 });
+  const setFilter = <K extends keyof Filters>(k: K, v: Filters[K]) => setF({ ...f, [k]: v });
+  return (
+    <div className="stack">
+      <PageHead eyebrow="Receipts" title={<>The <em>shelf.</em></>} actions={<><button type="button" className="btn" disabled={!rows.length} onClick={() => downloadText('receipts.csv', toCSV(CSV_HEADERS, csvRows(rows)), 'text/csv')}>Export CSV</button><a className="btn btn-primary" href="#/add">Add receipt</a></>} />
+      {flash && <Notice kind={flash.kind} onDismiss={() => setFlash(null)}>{flash.text}</Notice>}
+      {dupes.length > 0 && <Notice kind="warn">{dupes.length} possible duplicate{dupes.length === 1 ? '' : 's'} found (same merchant, date and total). <button type="button" className="btn btn-sm btn-ghost" aria-pressed={onlyDupes} onClick={() => setOnlyDupes(!onlyDupes)}>{onlyDupes ? 'Show all receipts' : 'Show duplicates only'}</button></Notice>}
+      {store.receipts.length === 0 ? (
+        <EmptyState title="No receipts yet" actions={<><a className="btn btn-primary" href="#/add">Add your first receipt</a><button type="button" className="btn" onClick={() => setStore({ receipts: demoReceipts(today) })}>Load demo receipts</button></>}>Start with today’s receipts while they’re still in your pocket.</EmptyState>
+      ) : (
+        <div className="card stack">
+          <div className="filters">
+            <Field label="Search" className="grow">{(p) => <input {...p} type="search" value={f.q} onChange={(e) => setFilter('q', e.target.value)} placeholder="Merchant, note or tag" />}</Field>
+            <Field label="Category">{(p) => <select {...p} value={f.category} onChange={(e) => setFilter('category', e.target.value)}><option value="">All</option>{CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select>}</Field>
+            <Field label="Claim status">{(p) => <select {...p} value={f.claim} onChange={(e) => setFilter('claim', e.target.value)}><option value="">All</option>{(Object.keys(CLAIM_LABEL) as Claim[]).map((c) => <option key={c} value={c}>{CLAIM_LABEL[c]}</option>)}</select>}</Field>
+            <Field label="Tag">{(p) => <select {...p} value={f.tag} onChange={(e) => setFilter('tag', e.target.value)}><option value="">Any</option>{tags.map((x) => <option key={x} value={x}>#{x}</option>)}</select>}</Field>
+            <Field label="From">{(p) => <input {...p} type="date" value={f.from} onChange={(e) => setFilter('from', e.target.value)} />}</Field>
+            <Field label="To">{(p) => <input {...p} type="date" value={f.to} onChange={(e) => setFilter('to', e.target.value)} />}</Field>
+          </div>
+          <p className="small" data-testid="totals"><strong>{t.count} receipt{t.count === 1 ? '' : 's'} · {money(t.total)}</strong> <span className="muted">including {money(t.tax)} tax</span></p>
+          <DataTable caption="Receipts" columns={columns} table={table} rowKey={(r) => r.id} empty={<>No receipts match. <button type="button" className="btn btn-sm btn-ghost" onClick={() => { setF({ q: '', category: '', claim: '', from: '', to: '', tag: '' }); setOnlyDupes(false); }}>Clear filters</button></>} />
+          {store.receipts.some((r) => r.demo) && <div><button type="button" className="btn btn-ghost btn-sm" onClick={() => { setStore({ receipts: store.receipts.filter((r) => !r.demo) }); setFlash({ kind: 'success', text: 'Demo receipts removed.' }); }}>Clear demo receipts</button></div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Add / edit ---------- */
+function Editor({ store, setStore, today, navigate, id }: Ctx & { id?: string }) {
+  const ex = id ? store.receipts.find((r) => r.id === id) : undefined;
+  const [d, setD] = useState<Draft>({ merchant: ex?.merchant ?? '', date: ex?.date ?? today, total: ex ? ex.total.toFixed(2) : '', tax: ex ? ex.tax.toFixed(2) : '', category: ex?.category ?? 'Groceries', method: ex?.method ?? 'Card', tags: ex?.tags.join(', ') ?? '', note: ex?.note ?? '', claim: ex?.claim ?? 'none' });
+  const [image, setImage] = useState<string | undefined>(ex?.image);
+  const [imgErr, setImgErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [confirmDupe, setConfirmDupe] = useState(false);
+  if (id && !ex) return <EmptyState title="Receipt not found" actions={<a className="btn btn-primary" href="#/receipts">Back to receipts</a>}>It may have been deleted.</EmptyState>;
+  const errors = submitted ? validate(d, today).errors : {};
+  const set = <K extends keyof Draft>(k: K, v: Draft[K]) => { setD({ ...d, [k]: v }); setConfirmDupe(false); };
+  const v = validate(d, today).value;
+  const dupes = v ? duplicatesOf({ id: ex?.id ?? '', merchant: v.merchant, date: v.date, total: v.total }, store.receipts) : [];
+
+  async function onFile(file?: File) {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return setImgErr('Choose an image file (JPEG, PNG or HEIC exported as JPEG).');
+    if (file.size > 15 * 1024 * 1024) return setImgErr('That image is over 15 MB. Choose a smaller one.');
+    setBusy(true);
+    setImgErr(null);
+    try {
+      setImage(await downscale(file));
+    } catch {
+      setImgErr('Couldn’t read that image. Try a JPEG or PNG.');
+    } finally {
+      setBusy(false);
+    }
+  }
+  function save(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitted(true);
+    const r = validate(d, today);
+    if (!r.value) return;
+    if (dupes.length && !confirmDupe) return setConfirmDupe(true);
+    const rec: Receipt = { ...r.value, id: ex?.id ?? uid('rcpt'), image };
+    const next = ex ? store.receipts.map((x) => (x.id === ex.id ? rec : x)) : [rec, ...store.receipts];
+    if (JSON.stringify(next).length > STORAGE_SOFT_LIMIT) return setImgErr('This browser’s storage is nearly full. Remove the photo or delete old receipts with photos.');
+    setStore({ receipts: next });
+    navigate('/receipts');
+  }
+  return (
+    <div className="stack">
+      <PageHead eyebrow={ex ? 'Receipt' : 'Add receipt'} title={ex ? <>{ex.merchant}</> : <>New <em>receipt.</em></>} actions={ex && <button type="button" className="btn btn-danger" onClick={() => { if (window.confirm('Delete this receipt and its photo?')) { setStore({ receipts: store.receipts.filter((x) => x.id !== ex.id) }); navigate('/receipts'); } }}>Delete</button>} />
+      {ex?.demo && <p><DemoTag /> <span className="small muted">A fictional demo receipt.</span></p>}
+      <form className="layout-main" onSubmit={save} noValidate>
+        <div className="card stack">
+          {Object.keys(errors).length > 0 && <Notice kind="error">Please fix the highlighted fields.</Notice>}
+          {confirmDupe && <Notice kind="warn">This looks like a duplicate of a receipt from {dupes[0].merchant} on {formatDay(dupes[0].date)} for {money(dupes[0].total)}. Press save again to keep both.</Notice>}
+          <div className="form-grid">
+            <Field label="Merchant" error={errors.merchant}>{(p) => <input {...p} value={d.merchant} onChange={(e) => set('merchant', e.target.value)} />}</Field>
+            <Field label="Date" error={errors.date}>{(p) => <input {...p} type="date" max={today} value={d.date} onChange={(e) => set('date', e.target.value)} />}</Field>
+            <Field label="Total (USD)" error={errors.total}>{(p) => <input {...p} inputMode="decimal" value={d.total} onChange={(e) => set('total', e.target.value)} placeholder="0.00" />}</Field>
+            <Field label="Tax included" hint="Optional" error={errors.tax}>{(p) => <input {...p} inputMode="decimal" value={d.tax} onChange={(e) => set('tax', e.target.value)} placeholder="0.00" />}</Field>
+            <Field label="Category">{(p) => <select {...p} value={d.category} onChange={(e) => set('category', e.target.value as Category)}>{CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select>}</Field>
+            <Field label="Paid by">{(p) => <select {...p} value={d.method} onChange={(e) => set('method', e.target.value as Method)}>{METHODS.map((m) => <option key={m}>{m}</option>)}</select>}</Field>
+            <Field label="Tags" hint="Comma separated, e.g. work, warranty">{(p) => <input {...p} value={d.tags} onChange={(e) => set('tags', e.target.value)} />}</Field>
+            <Field label="Expense claim">{(p) => <select {...p} value={d.claim} onChange={(e) => set('claim', e.target.value as Claim)}>{(Object.keys(CLAIM_LABEL) as Claim[]).map((c) => <option key={c} value={c}>{CLAIM_LABEL[c]}</option>)}</select>}</Field>
+          </div>
+          <Field label="Note">{(p) => <textarea {...p} rows={2} value={d.note} onChange={(e) => set('note', e.target.value)} />}</Field>
+          <div className="row"><button className="btn btn-primary" type="submit" disabled={busy}>{ex ? 'Save changes' : 'Save receipt'}</button><a className="btn btn-ghost" href="#/receipts">Cancel</a></div>
+        </div>
+        <aside className="card stack">
+          <p className="eyebrow">Photo</p>
+          {image ? <><img src={image} alt={`Photo of the receipt from ${d.merchant || 'this merchant'}`} className="receipt-img" /><button type="button" className="btn btn-sm btn-ghost" onClick={() => setImage(undefined)}>Remove photo</button></> : <div className="photo-empty">{busy ? <span className="spinner" aria-label="Processing image" /> : <span className="small muted">No photo attached</span>}</div>}
+          <label className="btn btn-sm">{image ? 'Replace photo' : 'Attach a photo'}<input type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => onFile(e.target.files?.[0])} /></label>
+          {imgErr && <p className="error-text" role="alert">{imgErr}</p>}
+          <p className="small muted">Images are resized to 720 px and stored only in this browser.</p>
+        </aside>
+      </form>
+    </div>
+  );
+}
+
+/* ---------- Claims ---------- */
+function Claims({ store, setStore }: Ctx) {
+  const [flash, setFlash] = useFlash();
+  const sum = claimSummary(store.receipts);
+  const stages: { claim: Claim; title: string; next?: string }[] = [
+    { claim: 'to-claim', title: 'To claim', next: 'Mark claimed' },
+    { claim: 'claimed', title: 'Claimed, awaiting payment', next: 'Mark reimbursed' },
+    { claim: 'reimbursed', title: 'Reimbursed' },
+  ];
+  function advanceAll(c: Claim) {
+    const n = store.receipts.filter((r) => r.claim === c).length;
+    setStore({ receipts: store.receipts.map((r) => (r.claim === c ? { ...r, claim: advanceClaim(c) } : r)) });
+    setFlash({ kind: 'success', text: `${n} receipt${n === 1 ? '' : 's'} moved to “${CLAIM_LABEL[advanceClaim(c)]}”.` });
+  }
+  return (
+    <div className="stack">
+      <PageHead eyebrow="Expense claims" title={<>Get your <em>money back.</em></>} description="Mark work receipts as “to claim”, export them for your employer, then track them until reimbursed." />
+      {flash && <Notice kind={flash.kind} onDismiss={() => setFlash(null)}>{flash.text}</Notice>}
+      <div className="stats" data-testid="claim-stats">
+        <div className="stat"><span className="stat-label">To claim</span><span className="stat-value">{money(sum.toClaim.total)}</span></div>
+        <div className="stat"><span className="stat-label">Awaiting payment</span><span className="stat-value">{money(sum.claimed.total)}</span></div>
+        <div className="stat"><span className="stat-label">Reimbursed</span><span className="stat-value">{money(sum.reimbursed.total)}</span></div>
+      </div>
+      <div className="claim-cols">
+        {stages.map((st) => {
+          const list = store.receipts.filter((r) => r.claim === st.claim).sort((a, b) => a.date.localeCompare(b.date));
+          return (
+            <section key={st.claim} className="card stack" aria-labelledby={`h-${st.claim}`}>
+              <div className="card-title-row"><h2 id={`h-${st.claim}`} className="h3">{st.title}</h2><span className="badge">{list.length}</span></div>
+              {list.length === 0 ? <p className="muted small">Nothing here.</p> : <ul className="claim-list">{list.map((r) => <li key={r.id}><a href={`#/receipt/${r.id}`}>{r.merchant}</a><span className="small muted">{formatDay(r.date, { day: 'numeric', month: 'short' })} · {money(r.total)}</span></li>)}</ul>}
+              {list.length > 0 && (
+                <div className="row">
+                  <button type="button" className="btn btn-sm" onClick={() => downloadText(`claim-${st.claim}.csv`, toCSV(CSV_HEADERS, [...csvRows(list), ['', 'TOTAL', '', '', totals(list).total.toFixed(2), totals(list).tax.toFixed(2), '', '', '']]), 'text/csv')}>Export CSV</button>
+                  {st.next && <button type="button" className="btn btn-sm btn-primary" onClick={() => advanceAll(st.claim)}>{st.next}</button>}
+                </div>
+              )}
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Reports ---------- */
+function Reports({ store, today }: Ctx) {
+  const [tip, setTip] = useState<string | null>(null);
+  const from = addMonths(`${today.slice(0, 7)}-01`, -5).slice(0, 7);
+  const months = byMonth(store.receipts, from, today.slice(0, 7));
+  const max = Math.max(50, ...months.map((m) => m.total));
+  const nice = Math.ceil(max / 100) * 100;
+  const recent = store.receipts.filter((r) => r.date >= `${from}-01`);
+  const cats = byCategory(recent);
+  const catMax = Math.max(1, ...cats.map((c) => c.total));
+  if (!store.receipts.length) return <EmptyState title="No receipts yet" actions={<a className="btn btn-primary" href="#/add">Add a receipt</a>}>Reports appear once you add receipts.</EmptyState>;
+  const t = totals(recent);
+  return (
+    <div className="stack">
+      <PageHead eyebrow="Reports" title={<>Where it <em>went.</em></>} description={`${fromISO(`${from}-01`).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })} – ${formatDay(today, { month: 'short', year: 'numeric' })}`} />
+      <div className="stats">
+        <div className="stat"><span className="stat-label">Spent, 6 months</span><span className="stat-value">{money(t.total)}</span></div>
+        <div className="stat"><span className="stat-label">Tax paid</span><span className="stat-value">{money(t.tax)}</span></div>
+        <div className="stat"><span className="stat-label">Receipts</span><span className="stat-value">{t.count}</span></div>
+        <div className="stat"><span className="stat-label">Average receipt</span><span className="stat-value">{money(t.count ? t.total / t.count : 0)}</span></div>
+      </div>
+      <div className="grid-2">
+        <section className="card stack" aria-labelledby="m-title">
+          <h2 id="m-title" className="h3">Spending per month</h2>
+          <div className="bars-wrap" onMouseLeave={() => setTip(null)}>
+            <div className="bars-axis" aria-hidden="true">{[nice, nice / 2, 0].map((x) => <span key={x}>${x}</span>)}</div>
+            <div className="bars" role="img" aria-label={months.map((m) => `${fromISO(`${m.month}-01`).toLocaleDateString(undefined, { month: 'short' })} ${money(m.total)}`).join(', ')}>
+              {months.map((m, i) => {
+                const text = `${fromISO(`${m.month}-01`).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}: ${money(m.total)} across ${m.count} receipt${m.count === 1 ? '' : 's'}`;
+                return (
+                  <div key={m.month} className="bar-col" style={{ ['--i' as string]: i }} tabIndex={0} aria-label={text} onMouseEnter={() => setTip(text)} onFocus={() => setTip(text)} onBlur={() => setTip(null)}>
+                    <div className="bar-stack" style={{ height: `${(m.total / nice) * 100}%` }}><span style={{ flexGrow: 1, background: 'var(--accent)' }} /></div>
+                    <span className="bar-label mono">{fromISO(`${m.month}-01`).toLocaleDateString(undefined, { month: 'short' })}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <p className="small" aria-live="polite">{tip ?? 'Hover or focus a month for details.'}</p>
+          <p className="legend"><span><i style={{ background: 'var(--accent)' }} />Total spent (USD)</span></p>
+        </section>
+        <section className="card stack" aria-labelledby="c-title">
+          <h2 id="c-title" className="h3">By category</h2>
+          <div className="table-wrap">
+            <table className="table">
+              <caption className="sr-only">Spending by category, last six months</caption>
+              <thead><tr><th scope="col">Category</th><th scope="col">Share</th><th scope="col" className="num">Receipts</th><th scope="col" className="num">Total</th></tr></thead>
+              <tbody>{cats.map((c) => <tr key={c.category}><th scope="row">{c.category}</th><td><span className="share"><span style={{ width: `${(c.total / catMax) * 100}%` }} /></span></td><td className="num">{c.count}</td><td className="num">{money(c.total)}</td></tr>)}</tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}

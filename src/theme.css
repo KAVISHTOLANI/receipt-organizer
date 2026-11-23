@@ -1,0 +1,8 @@
+/* Receipt Shelf palette and display type. Shared components read these tokens. */
+:root {
+  --accent: #5b4a1e;
+  --font-display: 'Bodoni Moda Variable', 'Didot', 'Bodoni 72', Georgia, serif;
+  --display-weight: 620;
+  --display-italic-weight: 500;
+  --display-tracking: -0.015em;
+}
